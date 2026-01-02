@@ -6,11 +6,10 @@ A comprehensive retirement planning calculator that projects portfolio growth, s
 
 Hosted at: [https://mjcrepeau.github.io/retirement-planner/](https://mjcrepeau.github.io/retirement-planner/)
 
-![Dashboard showing retirement account totals, income, etc.](screenshots/dashboard.png "Main dashboard")
-
 ## Features
 
 ### Portfolio Management
+- **Country Selection**: Choose USA or Poland (PL) and see country-specific labels and tax logic
 - **Multiple Account Types**: Support for Traditional 401(k), Roth 401(k), Traditional IRA, Roth IRA, Taxable Brokerage, and HSA accounts
 - **Employer Matching**: Configure employer match percentage and limits for 401(k) accounts
 - **Individual Returns**: Set expected return rates per account
@@ -24,18 +23,20 @@ Hosted at: [https://mjcrepeau.github.io/retirement-planner/](https://mjcrepeau.g
 
 ### Tax-Optimized Withdrawals
 The withdrawal algorithm follows a tax-efficient strategy:
-1. **Required Minimum Distributions (RMDs)**: Mandatory withdrawals from traditional accounts starting at age 73
-2. **Tax Bracket Optimization**: Fill lower tax brackets with traditional withdrawals
-3. **Roth Withdrawals**: Tax-free withdrawals for remaining needs
-4. **Taxable Account Withdrawals**: With capital gains tracking
-5. **HSA**: Used last, tax-free for qualified medical expenses
+1. **Required Minimum Distributions (USA)**: Mandatory withdrawals from traditional accounts starting at age 73
+2. **Tax Bracket Optimization**: Fill lower tax brackets with traditional withdrawals (or PIT scale in PL)
+3. **Tax-Free Accounts**: Roth/IKE withdrawals for remaining needs
+4. **Taxable Account Withdrawals**: With capital gains tracking (Belka in PL)
+5. **HSA**: Used last, tax-free for qualified medical expenses (USA)
 
 ### Tax Calculations
-- 2024 Federal income tax brackets (Single and Married Filing Jointly)
-- Long-term capital gains rates with 0%/15%/20% brackets
-- State tax rate configuration
-- Standard deduction applied automatically
-- Social Security taxation (85% taxable)
+- USA: 2024 federal income tax brackets (Single and Married Filing Jointly)
+- USA: long-term capital gains rates with 0%/15%/20% brackets
+- USA: state tax rate configuration and standard deduction
+- USA: Social Security taxation (85% taxable)
+- PL: PIT (scale 12%/32%, linear 19%, or ryczalt rate)
+- PL: tax-free allowance (kwota wolna) for PIT scale
+- PL: capital gains tax (Belka 19%)
 
 ### Visualizations
 - **Accumulation Chart**: Stacked area chart showing portfolio growth by account
@@ -44,22 +45,14 @@ The withdrawal algorithm follows a tax-efficient strategy:
 - **Tax Chart**: Tax burden over time
 - **Composition Chart**: Pie chart of portfolio allocation by tax treatment
 
-### Screenshots
-![Graph showing cash accumulation over working years](screenshots/accumulation.png "Accumulation graph")
-![Graph showing account drawdown over retirement years](screenshots/drawdown.png "Drawdown graph")
-![Graph showing retirement invome year by year](screenshots/income.png "Income graph")
-![Graph showing retirement taxe burden year by year](screenshots/taxes.png "Tax burden graph")
-![Table showing yearly income and spending calculations](screenshots/yearly.png "Yearly income table")
-
-
 ### Calculation Transparency
 Full visibility into how every number is calculated:
 
 - **Methodology Tab**: Complete reference documentation including:
   - All formulas used in accumulation and withdrawal phases
-  - 2024 federal tax brackets (Single and MFJ)
-  - Long-term capital gains rate tables
-  - IRS Required Minimum Distribution (RMD) table
+  - Country-specific tax brackets and assumptions (USA/PL)
+  - Long-term capital gains rate tables (USA) and Belka (PL)
+  - IRS Required Minimum Distribution (RMD) table (USA)
   - Tax-optimized withdrawal strategy explanation
   - Important assumptions and limitations
 
@@ -156,8 +149,9 @@ src/
 │   └── index.ts              # TypeScript type definitions
 ├── utils/
 │   ├── constants.ts          # Tax brackets, RMD tables, defaults
+│   ├── formatting.ts         # Currency formatting helpers
 │   ├── projections.ts        # Accumulation phase calculations
-│   ├── taxes.ts              # Tax calculation functions
+│   ├── taxes.ts              # Tax calculation functions (USA/PL)
 │   └── withdrawals.ts        # Withdrawal phase simulation
 ├── tests/
 │   └── calculations.test.ts  # Comprehensive math tests
@@ -176,7 +170,7 @@ For each year until retirement:
 
 ### Withdrawal Phase
 For each year of retirement:
-1. Calculate Required Minimum Distribution (if age 73+)
+1. Calculate Required Minimum Distribution (if age 73+ and USA)
 2. Determine target spending (safe withdrawal rate + inflation)
 3. Subtract Social Security income from spending need
 4. Withdraw from accounts in tax-optimized order
@@ -186,8 +180,9 @@ For each year of retirement:
 ### Key Assumptions
 - Investment returns are applied annually
 - Contributions are made at year-end
-- RMDs follow the IRS Uniform Lifetime Table
-- Social Security benefits grow with inflation
+- RMDs follow the IRS Uniform Lifetime Table (USA)
+- Social Security benefits grow with inflation (USA)
+- ZUS benefits are treated as taxable income (PL)
 - Tax brackets are 2024 values (not inflation-adjusted)
 
 ## Configuration
@@ -195,14 +190,17 @@ For each year of retirement:
 ### Default Values
 | Setting | Default |
 |---------|---------|
+| Country | USA |
 | Current Age | 35 |
 | Retirement Age | 65 |
 | Life Expectancy | 90 |
 | Inflation Rate | 3% |
 | Safe Withdrawal Rate | 4% |
 | Retirement Return Rate | 5% |
-| Social Security Benefit | $30,000/year |
+| Social Security Benefit | 30,000/year |
 | Social Security Start Age | 67 |
+| PL Tax Regime | Scale |
+| PL Ryczalt Rate | 12% |
 
 ### Account Defaults
 | Setting | Default |
@@ -219,9 +217,10 @@ npm test
 ```
 
 Tests cover:
-- Federal and state tax calculations
+- Federal and state tax calculations (USA)
+- PIT and Belka calculations (PL)
 - Capital gains taxation
-- RMD calculations
+- RMD calculations (USA)
 - Accumulation phase projections
 - Withdrawal phase simulations
 - Edge cases (zero balances, long retirements, etc.)
