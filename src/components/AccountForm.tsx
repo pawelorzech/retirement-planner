@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Account, AccountType, getAccountTypeLabel, is401k } from '../types';
+import { Account, AccountType, Country, getAccountTypeLabel, is401k } from '../types';
 import { NumberInput } from './NumberInput';
 import { Tooltip } from './Tooltip';
 import { v4 as uuidv4 } from 'uuid';
+import { getCurrencyCode } from '../utils/formatting';
 
 interface AccountFormProps {
   account?: Account;
+  country: Country;
   onSave: (account: Account) => void;
   onCancel: () => void;
 }
@@ -22,7 +24,7 @@ const defaultAccount: Omit<Account, 'id'> = {
 const inputClassName = "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-white";
 const inputErrorClassName = "w-full px-3 py-2 border border-red-500 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-white";
 
-export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
+export function AccountForm({ account, country, onSave, onCancel }: AccountFormProps) {
   // Initialize form data from account prop (component is re-mounted with key when account changes)
   const [formData, setFormData] = useState<Omit<Account, 'id'>>(() => {
     if (account) {
@@ -101,7 +103,7 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
           type="text"
           value={formData.name}
           onChange={(e) => handleChange('name', e.target.value)}
-          placeholder="e.g., Company 401(k)"
+          placeholder={country === 'pl' ? 'np. IKZE lub IKE' : 'e.g., Company 401(k)'}
           className={errors.name ? inputErrorClassName : inputClassName}
         />
         {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
@@ -118,7 +120,7 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
         >
           {accountTypes.map(type => (
             <option key={type} value={type}>
-              {getAccountTypeLabel(type)}
+              {getAccountTypeLabel(type, country)}
             </option>
           ))}
         </select>
@@ -127,7 +129,7 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Current Balance ($)
+            Current Balance ({getCurrencyCode(country)})
           </label>
           <NumberInput
             value={formData.balance}
@@ -141,7 +143,7 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Annual Contribution ($)
+            Annual Contribution ({getCurrencyCode(country)})
           </label>
           <NumberInput
             value={formData.annualContribution}
@@ -214,8 +216,8 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Match Limit ($)
-                <Tooltip text="Maximum annual employer match in dollars" />
+                Match Limit ({getCurrencyCode(country)})
+                <Tooltip text="Maximum annual employer match in currency units" />
               </label>
               <NumberInput
                 value={formData.employerMatchLimit || 0}

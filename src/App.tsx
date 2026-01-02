@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Account, Profile, Assumptions } from './types';
 import { DEFAULT_PROFILE, DEFAULT_ASSUMPTIONS } from './utils/constants';
 import { useRetirementCalc } from './hooks/useRetirementCalc';
@@ -61,6 +61,21 @@ function App() {
 
   // Dark mode
   const [isDarkMode, toggleDarkMode] = useDarkMode();
+
+  useEffect(() => {
+    const needsCountry = !profile.country;
+    const needsPlDefaults = profile.country === 'pl' && (!profile.plTaxRegime || profile.plRyczaltRate === undefined);
+
+    if (needsCountry || needsPlDefaults) {
+      setProfile({
+        ...DEFAULT_PROFILE,
+        ...profile,
+        country: profile.country ?? 'usa',
+        plTaxRegime: profile.plTaxRegime ?? 'scale',
+        plRyczaltRate: profile.plRyczaltRate ?? 0.12,
+      });
+    }
+  }, [profile, setProfile]);
 
   // UI state (not persisted)
   const [activeTab, setActiveTab] = useState<TabType>('summary');
@@ -171,6 +186,7 @@ function App() {
               <div className="px-4 pb-4">
                 <AccountList
                   accounts={accounts}
+                  country={profile.country}
                   onAdd={handleAddAccount}
                   onUpdate={handleUpdateAccount}
                   onDelete={handleDeleteAccount}
@@ -287,7 +303,7 @@ function App() {
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                       Portfolio Composition at Retirement
                     </h3>
-                    <ChartComposition accounts={accounts} result={accumulation} isDarkMode={isDarkMode} />
+                    <ChartComposition accounts={accounts} result={accumulation} isDarkMode={isDarkMode} country={profile.country} />
                   </div>
                 </div>
               )}
@@ -299,10 +315,10 @@ function App() {
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                       Account Growth (Age {profile.currentAge} to {profile.retirementAge})
                     </h3>
-                    <ChartAccumulation accounts={accounts} result={accumulation} isDarkMode={isDarkMode} />
+                    <ChartAccumulation accounts={accounts} result={accumulation} isDarkMode={isDarkMode} country={profile.country} />
                   </div>
 
-                  <DataTableAccumulation accounts={accounts} result={accumulation} />
+                    <DataTableAccumulation accounts={accounts} result={accumulation} country={profile.country} />
 
                   <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -320,30 +336,30 @@ function App() {
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                       Portfolio Drawdown (Age {profile.retirementAge} to {profile.lifeExpectancy})
                     </h3>
-                    <ChartDrawdown accounts={accounts} result={retirement} isDarkMode={isDarkMode} />
+                    <ChartDrawdown accounts={accounts} result={retirement} isDarkMode={isDarkMode} country={profile.country} />
                   </div>
 
                   <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                       Annual Retirement Income
                     </h3>
-                    <ChartIncome result={retirement} isDarkMode={isDarkMode} />
+                    <ChartIncome result={retirement} isDarkMode={isDarkMode} country={profile.country} />
                   </div>
 
                   <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                       Tax Burden Over Time
                     </h3>
-                    <ChartTax result={retirement} isDarkMode={isDarkMode} />
+                    <ChartTax result={retirement} isDarkMode={isDarkMode} country={profile.country} />
                   </div>
 
-                  <DataTableWithdrawal accounts={accounts} result={retirement} />
+                    <DataTableWithdrawal accounts={accounts} result={retirement} country={profile.country} />
                 </div>
               )}
 
               {/* Methodology Tab */}
               {activeTab === 'methodology' && (
-                <MethodologyPanel profile={profile} assumptions={assumptions} />
+                  <MethodologyPanel profile={profile} assumptions={assumptions} />
               )}
             </>
           )}

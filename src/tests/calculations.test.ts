@@ -12,10 +12,18 @@ import {
   calculateTotalFederalTax,
   calculateStateTax,
   calculateCapitalGainsTax,
+  calculatePolandIncomeTax,
+  calculatePolandCapitalGainsTax,
   getStandardDeduction,
 } from '../utils/taxes';
-import { getRMDDivisor } from '../utils/constants';
+import { DEFAULT_PROFILE, getRMDDivisor } from '../utils/constants';
 import { Account, Profile, Assumptions } from '../types';
+
+const BASE_PROFILE: Profile = {
+  ...DEFAULT_PROFILE,
+  socialSecurityBenefit: 0,
+  socialSecurityStartAge: 67,
+};
 
 // Test utilities
 let passedTests = 0;
@@ -172,6 +180,7 @@ function testAccumulationPhase(): void {
   };
 
   const profile1: Profile = {
+    ...BASE_PROFILE,
     currentAge: 30,
     retirementAge: 31, // 1 year
     lifeExpectancy: 90,
@@ -303,6 +312,7 @@ function testWithdrawalPhase(): void {
   };
 
   const profile: Profile = {
+    ...BASE_PROFILE,
     currentAge: 65,
     retirementAge: 65,
     lifeExpectancy: 66, // Just 1 year of retirement
@@ -348,6 +358,7 @@ function testWithdrawalPhase(): void {
   ];
 
   const profile2: Profile = {
+    ...BASE_PROFILE,
     currentAge: 65,
     retirementAge: 65,
     lifeExpectancy: 66,
@@ -366,6 +377,7 @@ function testWithdrawalPhase(): void {
   console.log('\n--- Social Security Integration ---');
 
   const profileSS: Profile = {
+    ...BASE_PROFILE,
     currentAge: 65,
     retirementAge: 65,
     lifeExpectancy: 68,
@@ -413,6 +425,7 @@ function testWithdrawalPhase(): void {
   console.log('\n--- RMD Enforcement Test ---');
 
   const profileRMD: Profile = {
+    ...BASE_PROFILE,
     currentAge: 72,
     retirementAge: 72,
     lifeExpectancy: 75,
@@ -465,6 +478,7 @@ function testIncomeContinuity(): void {
   };
 
   const profile: Profile = {
+    ...BASE_PROFILE,
     currentAge: 35,
     retirementAge: 65,
     lifeExpectancy: 90,
@@ -574,6 +588,7 @@ function testEdgeCases(): void {
   };
 
   const profile: Profile = {
+    ...BASE_PROFILE,
     currentAge: 30,
     retirementAge: 65,
     lifeExpectancy: 90,
@@ -716,6 +731,51 @@ function testCapitalGainsEdgeCases(): void {
   // Any gains would be at 15%
   const cgTax7 = calculateCapitalGainsTax(10000, 123250, 'married_filing_jointly');
   assertApprox(cgTax7, 1500, 0.01, '$10k gains at exactly 0% bracket cap = $1,500 (15%)');
+
+  console.log('\n--- Poland PIT (Scale) ---');
+
+  const plProfileScale: Profile = {
+    ...BASE_PROFILE,
+    country: 'pl',
+    plTaxRegime: 'scale',
+  };
+
+  const plTax1 = calculatePolandIncomeTax(30000, plProfileScale);
+  assertApprox(plTax1, 0, 0.01, 'PL: income within tax-free allowance = 0');
+
+  const plTax2 = calculatePolandIncomeTax(60000, plProfileScale);
+  assertApprox(plTax2, 3600, 0.01, 'PL: 60k income -> 3,600 tax (12% over 30k)');
+
+  const plTax3 = calculatePolandIncomeTax(200000, plProfileScale);
+  assertApprox(plTax3, 30400, 1, 'PL: 200k income -> 30,400 tax (scale)');
+
+  console.log('\n--- Poland PIT (Linear) ---');
+
+  const plProfileLinear: Profile = {
+    ...BASE_PROFILE,
+    country: 'pl',
+    plTaxRegime: 'linear',
+  };
+
+  const plLinearTax = calculatePolandIncomeTax(100000, plProfileLinear);
+  assertApprox(plLinearTax, 19000, 0.01, 'PL: linear 19% on 100k = 19,000');
+
+  console.log('\n--- Poland PIT (Ryczalt) ---');
+
+  const plProfileRyczalt: Profile = {
+    ...BASE_PROFILE,
+    country: 'pl',
+    plTaxRegime: 'ryczalt',
+    plRyczaltRate: 0.1,
+  };
+
+  const plRyczaltTax = calculatePolandIncomeTax(100000, plProfileRyczalt);
+  assertApprox(plRyczaltTax, 10000, 0.01, 'PL: ryczalt 10% on 100k = 10,000');
+
+  console.log('\n--- Poland Capital Gains (Belka) ---');
+
+  const plCgTax = calculatePolandCapitalGainsTax(10000);
+  assertApprox(plCgTax, 1900, 0.01, 'PL: 19% on 10k gains = 1,900');
 }
 
 // =============================================================================
@@ -740,6 +800,7 @@ function testWithdrawalStrategyDetails(): void {
   };
 
   const profile: Profile = {
+    ...BASE_PROFILE,
     currentAge: 65,
     retirementAge: 65,
     lifeExpectancy: 66,
@@ -895,6 +956,7 @@ function testCostBasisTracking(): void {
   };
 
   const profile: Profile = {
+    ...BASE_PROFILE,
     currentAge: 65,
     retirementAge: 65,
     lifeExpectancy: 66,
@@ -965,6 +1027,7 @@ function testRMDInteractions(): void {
   };
 
   const profile: Profile = {
+    ...BASE_PROFILE,
     currentAge: 73,
     retirementAge: 73,
     lifeExpectancy: 75,
@@ -1044,6 +1107,7 @@ function testInflationConsistency(): void {
   };
 
   const profile: Profile = {
+    ...BASE_PROFILE,
     currentAge: 65,
     retirementAge: 65,
     lifeExpectancy: 70,
@@ -1074,6 +1138,7 @@ function testInflationConsistency(): void {
   console.log('\n--- Social Security inflated correctly ---');
 
   const ssProfile: Profile = {
+    ...BASE_PROFILE,
     currentAge: 60,
     retirementAge: 65,
     lifeExpectancy: 70,
@@ -1117,6 +1182,7 @@ function testPortfolioDepletion(): void {
   };
 
   const profile: Profile = {
+    ...BASE_PROFILE,
     currentAge: 65,
     retirementAge: 65,
     lifeExpectancy: 80,

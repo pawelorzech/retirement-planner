@@ -9,11 +9,10 @@ import {
   isTraditional,
 } from '../types';
 import {
-  calculateTotalFederalTax,
-  calculateStateTax,
   getStandardDeduction,
+  calculateCountryTaxes,
 } from './taxes';
-import { getRMDDivisor, RMD_START_AGE } from './constants';
+import { getRMDDivisor, RMD_START_AGE, PL_TAX_FREE_ALLOWANCE, PL_TAX_THRESHOLD } from './constants';
 
 interface AccountState {
   id: string;
@@ -30,6 +29,13 @@ function calculateRMD(age: number, traditionalBalance: number): number {
   const divisor = getRMDDivisor(age);
   if (divisor <= 0) return 0;
   return traditionalBalance / divisor;
+}
+
+function getTaxablePensionIncome(amount: number, profile: Profile): number {
+  if (profile.country === 'pl') {
+    return amount;
+  }
+  return amount * 0.85;
 }
 
 /**
@@ -97,7 +103,9 @@ export function calculateWithdrawals(
     const traditionalBalance = accountStates
       .filter(acc => isTraditional(acc.type))
       .reduce((sum, acc) => sum + acc.balance, 0);
-    const rmdAmount = calculateRMD(age, traditionalBalance);
+    const rmdAmount = profile.country === 'usa'
+      ? calculateRMD(age, traditionalBalance)
+      : 0;
 
     // Tax-optimized withdrawal strategy
     const withdrawals = performTaxOptimizedWithdrawal(
@@ -116,19 +124,15 @@ export function calculateWithdrawals(
     });
 
     // Calculate taxes
-    const ordinaryIncome = withdrawals.traditionalWithdrawal + socialSecurityIncome * 0.85; // 85% of SS taxable
+    const ordinaryIncome = withdrawals.traditionalWithdrawal +
+      getTaxablePensionIncome(socialSecurityIncome, profile);
     const capitalGains = withdrawals.taxableGains;
 
-    const federalTax = calculateTotalFederalTax(
+    const { federalTax, stateTax, totalTax } = calculateCountryTaxes(
       ordinaryIncome,
       capitalGains,
-      profile.filingStatus
+      profile
     );
-    const stateTax = calculateStateTax(
-      ordinaryIncome + capitalGains - getStandardDeduction(profile.filingStatus),
-      profile.stateTaxRate
-    );
-    const totalTax = federalTax + stateTax;
     lifetimeTaxesPaid += totalTax;
 
     const grossWithdrawal = withdrawals.total;
@@ -231,33 +235,42 @@ function performTaxOptimizedWithdrawal(
     getTaxTreatment(acc.type) === 'hsa'
   );
 
-  // Step 1: Take RMDs from traditional accounts (required)
+  // Step 1: Take RMDs from traditional accounts (required, USA only)
   let rmdRemaining = rmdAmount;
-  for (const acc of traditionalAccounts) {
-    if (rmdRemaining <= 0) break;
-    const withdrawal = Math.min(rmdRemaining, acc.balance);
-    acc.balance -= withdrawal;
-    result.byAccount[acc.id] += withdrawal;
-    result.traditionalWithdrawal += withdrawal;
-    result.total += withdrawal;
-    rmdRemaining -= withdrawal;
-    remainingNeed = Math.max(0, remainingNeed - withdrawal);
+  if (profile.country === 'usa') {
+    for (const acc of traditionalAccounts) {
+      if (rmdRemaining <= 0) break;
+      const withdrawal = Math.min(rmdRemaining, acc.balance);
+      acc.balance -= withdrawal;
+      result.byAccount[acc.id] += withdrawal;
+      result.traditionalWithdrawal += withdrawal;
+      result.total += withdrawal;
+      rmdRemaining -= withdrawal;
+      remainingNeed = Math.max(0, remainingNeed - withdrawal);
 
-    if (acc.balance <= 0 && accountDepletionAges[acc.id] === null) {
-      accountDepletionAges[acc.id] = age;
+      if (acc.balance <= 0 && accountDepletionAges[acc.id] === null) {
+        accountDepletionAges[acc.id] = age;
+      }
     }
   }
 
-  // Step 2: Fill up to 12% bracket with additional traditional withdrawals
-  // (Standard deduction + 12% bracket gives good tax efficiency)
-  const standardDeduction = getStandardDeduction(profile.filingStatus);
-  const bracket12Max = profile.filingStatus === 'married_filing_jointly' ? 94300 : 47150;
-  const targetOrdinaryIncome = standardDeduction + bracket12Max;
-  const currentOrdinaryIncome = result.traditionalWithdrawal + socialSecurityIncome * 0.85;
-  const roomIn12Bracket = Math.max(0, targetOrdinaryIncome - currentOrdinaryIncome);
+  // Step 2: Prefer low-bracket traditional withdrawals where applicable
+  const taxablePensionIncome = getTaxablePensionIncome(socialSecurityIncome, profile);
+  const currentOrdinaryIncome = result.traditionalWithdrawal + taxablePensionIncome;
+  let roomInPreferredBracket = 0;
+
+  if (profile.country === 'usa') {
+    const standardDeduction = getStandardDeduction(profile.filingStatus);
+    const bracket12Max = profile.filingStatus === 'married_filing_jointly' ? 94300 : 47150;
+    const targetOrdinaryIncome = standardDeduction + bracket12Max;
+    roomInPreferredBracket = Math.max(0, targetOrdinaryIncome - currentOrdinaryIncome);
+  } else if ((profile.plTaxRegime ?? 'scale') === 'scale') {
+    const targetOrdinaryIncome = PL_TAX_FREE_ALLOWANCE + PL_TAX_THRESHOLD;
+    roomInPreferredBracket = Math.max(0, targetOrdinaryIncome - currentOrdinaryIncome);
+  }
 
   // Withdraw additional from traditional if we have room and need the money
-  const additionalTraditional = Math.min(roomIn12Bracket, remainingNeed);
+  const additionalTraditional = Math.min(roomInPreferredBracket, remainingNeed);
   let additionalRemaining = additionalTraditional;
 
   for (const acc of traditionalAccounts) {

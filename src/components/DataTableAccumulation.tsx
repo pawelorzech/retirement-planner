@@ -1,23 +1,17 @@
 import { useState } from 'react';
-import { Account, AccumulationResult, getTaxTreatment } from '../types';
+import { Account, AccumulationResult, Country, getTaxTreatment } from '../types';
 import { is401k } from '../types';
+import { formatCurrency } from '../utils/formatting';
 
 interface DataTableAccumulationProps {
   accounts: Account[];
   result: AccumulationResult;
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value);
+  country: Country;
 }
 
 type ViewMode = 'summary' | 'balances' | 'contributions';
 
-export function DataTableAccumulation({ accounts, result }: DataTableAccumulationProps) {
+export function DataTableAccumulation({ accounts, result, country }: DataTableAccumulationProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('summary');
 
@@ -131,12 +125,12 @@ export function DataTableAccumulation({ accounts, result }: DataTableAccumulatio
                       <tr key={yearData.age} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                         <td className="py-2 px-2 font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-gray-800">{yearData.age}</td>
                         <td className="py-2 px-2 text-gray-600 dark:text-gray-400">{yearData.year}</td>
-                        <td className="py-2 px-2 text-right font-mono text-gray-900 dark:text-white">{formatCurrency(yearData.totalBalance)}</td>
+                        <td className="py-2 px-2 text-right font-mono text-gray-900 dark:text-white">{formatCurrency(yearData.totalBalance, country)}</td>
                         <td className={`py-2 px-2 text-right font-mono ${growth >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {index === 0 ? '-' : (growth >= 0 ? '+' : '') + formatCurrency(growth)}
+                          {index === 0 ? '-' : (growth >= 0 ? '+' : '') + formatCurrency(growth, country)}
                         </td>
                         <td className="py-2 px-2 text-right font-mono text-gray-600 dark:text-gray-400">
-                          {formatCurrency(totalContrib + totalMatch)}
+                          {formatCurrency(totalContrib + totalMatch, country)}
                         </td>
                       </tr>
                     );
@@ -164,11 +158,11 @@ export function DataTableAccumulation({ accounts, result }: DataTableAccumulatio
                       <td className="py-2 px-2 font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-gray-800">{yearData.age}</td>
                       {accounts.map(acc => (
                         <td key={acc.id} className="py-2 px-2 text-right font-mono text-gray-600 dark:text-gray-400">
-                          {formatCurrency(yearData.balances[acc.id] || 0)}
+                          {formatCurrency(yearData.balances[acc.id] || 0, country)}
                         </td>
                       ))}
                       <td className="py-2 px-2 text-right font-mono font-medium text-gray-900 dark:text-white">
-                        {formatCurrency(yearData.totalBalance)}
+                        {formatCurrency(yearData.totalBalance, country)}
                       </td>
                     </tr>
                   ))}
@@ -202,17 +196,17 @@ export function DataTableAccumulation({ accounts, result }: DataTableAccumulatio
                           totalContrib += contrib + match;
                           return (
                             <td key={acc.id} className="py-2 px-2 text-right font-mono text-gray-600 dark:text-gray-400">
-                              {formatCurrency(contrib)}
+                              {formatCurrency(contrib, country)}
                               {match > 0 && (
                                 <span className="text-green-600 dark:text-green-400 text-xs ml-1">
-                                  +{formatCurrency(match)}
+                                  +{formatCurrency(match, country)}
                                 </span>
                               )}
                             </td>
                           );
                         })}
                         <td className="py-2 px-2 text-right font-mono font-medium text-gray-900 dark:text-white">
-                          {formatCurrency(totalContrib)}
+                          {formatCurrency(totalContrib, country)}
                         </td>
                       </tr>
                     );
@@ -229,7 +223,7 @@ export function DataTableAccumulation({ accounts, result }: DataTableAccumulatio
                       }, 0);
                       return (
                         <td key={acc.id} className="py-2 px-2 text-right font-mono font-medium text-gray-700 dark:text-gray-300">
-                          {formatCurrency(lifetimeContrib)}
+                          {formatCurrency(lifetimeContrib, country)}
                         </td>
                       );
                     })}
@@ -241,7 +235,8 @@ export function DataTableAccumulation({ accounts, result }: DataTableAccumulatio
                             const match = getEmployerMatch(acc, contrib);
                             return accSum + contrib + match;
                           }, 0);
-                        }, 0)
+                        }, 0),
+                        country
                       )}
                     </td>
                   </tr>

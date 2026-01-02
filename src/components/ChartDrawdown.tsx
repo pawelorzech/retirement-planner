@@ -8,31 +8,15 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import { Account, RetirementResult, getTaxTreatment } from '../types';
+import { Account, Country, RetirementResult, getTaxTreatment } from '../types';
 import { CHART_COLORS } from '../utils/constants';
+import { formatCompactCurrency, formatCurrency } from '../utils/formatting';
 
 interface ChartDrawdownProps {
   accounts: Account[];
   result: RetirementResult;
   isDarkMode?: boolean;
-}
-
-function formatCurrency(value: number): string {
-  if (value >= 1000000) {
-    return `$${(value / 1000000).toFixed(1)}M`;
-  }
-  if (value >= 1000) {
-    return `$${(value / 1000).toFixed(0)}K`;
-  }
-  return `$${value.toFixed(0)}`;
-}
-
-function formatTooltipValue(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value);
+  country: Country;
 }
 
 interface TooltipPayload {
@@ -47,9 +31,10 @@ interface CustomTooltipProps {
   label?: number;
   accounts: Account[];
   result: RetirementResult;
+  country: Country;
 }
 
-function CustomTooltip({ active, payload, label, accounts, result }: CustomTooltipProps) {
+function CustomTooltip({ active, payload, label, accounts, result, country }: CustomTooltipProps) {
   if (!active || !payload) return null;
 
   const yearData = result.yearlyWithdrawals.find(y => y.age === label);
@@ -63,19 +48,19 @@ function CustomTooltip({ active, payload, label, accounts, result }: CustomToolt
         return (
           <div key={index} className="flex justify-between gap-4 text-sm">
             <span style={{ color: entry.color }}>{account?.name || entry.name}:</span>
-            <span className="font-medium text-gray-900 dark:text-white">{formatTooltipValue(entry.value)}</span>
+            <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(entry.value, country)}</span>
           </div>
         );
       })}
       <div className="border-t border-gray-200 dark:border-gray-600 mt-2 pt-2 space-y-1 text-sm">
         <div className="flex justify-between gap-4 font-semibold text-gray-900 dark:text-white">
           <span>Total Portfolio:</span>
-          <span>{formatTooltipValue(total)}</span>
+          <span>{formatCurrency(total, country)}</span>
         </div>
         {yearData && (
           <div className="flex justify-between gap-4 text-gray-600 dark:text-gray-400">
             <span>Annual Withdrawal:</span>
-            <span>{formatTooltipValue(yearData.totalWithdrawal)}</span>
+            <span>{formatCurrency(yearData.totalWithdrawal, country)}</span>
           </div>
         )}
       </div>
@@ -83,7 +68,7 @@ function CustomTooltip({ active, payload, label, accounts, result }: CustomToolt
   );
 }
 
-export function ChartDrawdown({ accounts, result, isDarkMode = false }: ChartDrawdownProps) {
+export function ChartDrawdown({ accounts, result, isDarkMode = false, country }: ChartDrawdownProps) {
   // Colors based on dark mode
   const gridColor = isDarkMode ? '#374151' : '#e5e7eb';
   const tickColor = isDarkMode ? '#9ca3af' : '#6b7280';
@@ -120,13 +105,13 @@ export function ChartDrawdown({ accounts, result, isDarkMode = false }: ChartDra
             stroke={tickLineColor}
           />
           <YAxis
-            tickFormatter={formatCurrency}
+            tickFormatter={(value: number) => formatCompactCurrency(value, country)}
             tick={{ fontSize: 12, fill: tickColor }}
             tickLine={{ stroke: tickLineColor }}
             stroke={tickLineColor}
             width={60}
           />
-          <Tooltip content={<CustomTooltip accounts={accounts} result={result} />} />
+          <Tooltip content={<CustomTooltip accounts={accounts} result={result} country={country} />} />
           <Legend
             wrapperStyle={{ paddingTop: '10px' }}
             formatter={(value) => {

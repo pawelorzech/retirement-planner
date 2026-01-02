@@ -6,37 +6,39 @@ import {
   Legend,
   Tooltip,
 } from 'recharts';
-import { Account, AccumulationResult, getTaxTreatment, TaxTreatment } from '../types';
+import { Account, AccumulationResult, Country, getTaxTreatment, TaxTreatment } from '../types';
 import { CHART_COLORS } from '../utils/constants';
+import { formatCurrency } from '../utils/formatting';
 
 interface ChartCompositionProps {
   accounts: Account[];
   result: AccumulationResult;
   isDarkMode?: boolean;
+  country: Country;
 }
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-const TAX_TREATMENT_LABELS: Record<TaxTreatment, string> = {
+const TAX_TREATMENT_LABELS_US: Record<TaxTreatment, string> = {
   pretax: 'Pre-Tax',
   roth: 'Roth (Tax-Free)',
   taxable: 'Taxable',
   hsa: 'HSA',
 };
 
+const TAX_TREATMENT_LABELS_PL: Record<TaxTreatment, string> = {
+  pretax: 'Pre-Tax (IKZE)',
+  roth: 'Tax-Free (IKE)',
+  taxable: 'Taxable (Belka)',
+  hsa: 'HSA (n/a)',
+};
+
 interface CustomTooltipProps {
   active?: boolean;
   payload?: Array<{ name: string; value: number; payload: { color: string } }>;
   total: number;
+  country: Country;
 }
 
-function CustomTooltip({ active, payload, total }: CustomTooltipProps) {
+function CustomTooltip({ active, payload, total, country }: CustomTooltipProps) {
   if (!active || !payload || !payload[0]) return null;
 
   const data = payload[0];
@@ -52,7 +54,7 @@ function CustomTooltip({ active, payload, total }: CustomTooltipProps) {
         <span className="font-medium text-gray-900 dark:text-white">{data.name}</span>
       </div>
       <div className="mt-1 text-sm">
-        <div className="text-gray-900 dark:text-white">{formatCurrency(data.value)}</div>
+        <div className="text-gray-900 dark:text-white">{formatCurrency(data.value, country)}</div>
         <div className="text-gray-500 dark:text-gray-400">{percentage}% of portfolio</div>
       </div>
     </div>
@@ -91,14 +93,15 @@ function renderCustomizedLabel(props: LabelProps) {
   );
 }
 
-export function ChartComposition({ accounts, result, isDarkMode = false }: ChartCompositionProps) {
+export function ChartComposition({ accounts, result, isDarkMode = false, country }: ChartCompositionProps) {
   // Colors based on dark mode
   const labelColor = isDarkMode ? '#9ca3af' : '#374151';
+  const labels = country === 'pl' ? TAX_TREATMENT_LABELS_PL : TAX_TREATMENT_LABELS_US;
   // Create data by tax treatment
   const taxTreatmentData = Object.entries(result.breakdownByTaxTreatment)
     .filter(([treatment]) => result.breakdownByTaxTreatment[treatment as TaxTreatment] > 0)
     .map(([treatment, value]) => ({
-      name: TAX_TREATMENT_LABELS[treatment as TaxTreatment],
+      name: labels[treatment as TaxTreatment],
       value,
       color: CHART_COLORS[treatment as TaxTreatment],
     }));
@@ -139,7 +142,7 @@ export function ChartComposition({ accounts, result, isDarkMode = false }: Chart
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip content={<CustomTooltip total={total} />} />
+              <Tooltip content={<CustomTooltip total={total} country={country} />} />
               <Legend
                 wrapperStyle={{ fontSize: '12px' }}
                 formatter={(value) => <span style={{ color: labelColor }}>{value}</span>}
@@ -172,7 +175,7 @@ export function ChartComposition({ accounts, result, isDarkMode = false }: Chart
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip content={<CustomTooltip total={total} />} />
+              <Tooltip content={<CustomTooltip total={total} country={country} />} />
               <Legend
                 wrapperStyle={{ fontSize: '12px' }}
                 formatter={(value) => <span style={{ color: labelColor }}>{value}</span>}

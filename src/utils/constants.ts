@@ -26,6 +26,17 @@ export const TAX_BRACKETS_SINGLE: TaxBracket[] = [
 export const STANDARD_DEDUCTION_MFJ = 29200;
 export const STANDARD_DEDUCTION_SINGLE = 14600;
 
+// Poland: PIT scale (2024, simplified)
+export const PL_TAX_FREE_ALLOWANCE = 30000;
+export const PL_TAX_THRESHOLD = 120000;
+export const PL_TAX_BRACKETS: TaxBracket[] = [
+  { min: 0, max: PL_TAX_THRESHOLD, rate: 0.12 },
+  { min: PL_TAX_THRESHOLD, max: Infinity, rate: 0.32 },
+];
+
+// Poland: capital gains tax (Belka)
+export const PL_CAPITAL_GAINS_RATE = 0.19;
+
 // Long-term capital gains rates (2024)
 export const CAPITAL_GAINS_BRACKETS_MFJ: TaxBracket[] = [
   { min: 0, max: 94050, rate: 0 },
@@ -116,6 +127,7 @@ export const CHART_COLORS = {
 
 // Default values for new app state
 export const DEFAULT_PROFILE = {
+  country: 'usa' as const,
   currentAge: 35,
   retirementAge: 65,
   lifeExpectancy: 90,
@@ -123,6 +135,8 @@ export const DEFAULT_PROFILE = {
   stateTaxRate: 0.05,
   socialSecurityBenefit: 30000,
   socialSecurityStartAge: 67,
+  plTaxRegime: 'scale' as const,
+  plRyczaltRate: 0.12,
 };
 
 export const DEFAULT_ASSUMPTIONS = {

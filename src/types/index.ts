@@ -6,9 +6,13 @@ export type AccountType =
   | 'taxable'
   | 'hsa';
 
+export type Country = 'usa' | 'pl';
+
 export type FilingStatus = 'single' | 'married_filing_jointly';
 
 export type TaxTreatment = 'pretax' | 'roth' | 'taxable' | 'hsa';
+
+export type PlTaxRegime = 'scale' | 'linear' | 'ryczalt';
 
 export interface Account {
   id: string;
@@ -23,6 +27,7 @@ export interface Account {
 }
 
 export interface Profile {
+  country: Country;
   currentAge: number;
   retirementAge: number;
   lifeExpectancy: number;
@@ -30,6 +35,8 @@ export interface Profile {
   stateTaxRate: number; // as decimal
   socialSecurityBenefit?: number; // annual, in today's dollars
   socialSecurityStartAge?: number;
+  plTaxRegime?: PlTaxRegime;
+  plRyczaltRate?: number; // as decimal
 }
 
 export interface Assumptions {
@@ -119,7 +126,21 @@ export function getTaxTreatment(accountType: AccountType): TaxTreatment {
   }
 }
 
-export function getAccountTypeLabel(type: AccountType): string {
+export function getAccountTypeLabel(type: AccountType, country: Country = 'usa'): string {
+  if (country === 'pl') {
+    switch (type) {
+      case 'traditional_401k':
+      case 'traditional_ira':
+        return 'IKZE (odliczenie podatkowe)';
+      case 'roth_401k':
+      case 'roth_ira':
+        return 'IKE (zwolnienie z podatku Belki)';
+      case 'taxable':
+        return 'Rachunek maklerski';
+      case 'hsa':
+        return 'Konto zdrowotne (brak PL odpowiednika)';
+    }
+  }
   switch (type) {
     case 'traditional_401k':
       return 'Traditional 401(k)';

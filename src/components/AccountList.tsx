@@ -1,21 +1,15 @@
 import { useState } from 'react';
-import { Account, getAccountTypeLabel, getTaxTreatment } from '../types';
+import { Account, Country, getAccountTypeLabel, getTaxTreatment } from '../types';
 import { AccountForm } from './AccountForm';
 import { CHART_COLORS } from '../utils/constants';
+import { formatCurrency } from '../utils/formatting';
 
 interface AccountListProps {
   accounts: Account[];
+  country: Country;
   onAdd: (account: Account) => void;
   onUpdate: (account: Account) => void;
   onDelete: (id: string) => void;
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value);
 }
 
 function getTaxTreatmentColor(type: Account['type']): string {
@@ -23,7 +17,7 @@ function getTaxTreatmentColor(type: Account['type']): string {
   return CHART_COLORS[treatment];
 }
 
-export function AccountList({ accounts, onAdd, onUpdate, onDelete }: AccountListProps) {
+export function AccountList({ accounts, country, onAdd, onUpdate, onDelete }: AccountListProps) {
   const [showForm, setShowForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | undefined>();
 
@@ -73,6 +67,7 @@ export function AccountList({ accounts, onAdd, onUpdate, onDelete }: AccountList
           <AccountForm
             key={editingAccount?.id ?? 'new'}
             account={editingAccount}
+            country={country}
             onSave={handleSave}
             onCancel={handleCancel}
           />
@@ -98,7 +93,7 @@ export function AccountList({ accounts, onAdd, onUpdate, onDelete }: AccountList
                 <div>
                   <div className="font-medium text-gray-900 dark:text-white">{account.name}</div>
                   <div className="text-sm text-gray-500 dark:text-gray-400">
-                    {getAccountTypeLabel(account.type)}
+                    {getAccountTypeLabel(account.type, country)}
                   </div>
                 </div>
               </div>
@@ -106,10 +101,10 @@ export function AccountList({ accounts, onAdd, onUpdate, onDelete }: AccountList
               <div className="flex items-center gap-4">
                 <div className="text-right">
                   <div className="font-medium text-gray-900 dark:text-white">
-                    {formatCurrency(account.balance)}
+                    {formatCurrency(account.balance, country)}
                   </div>
                   <div className="text-sm text-gray-500 dark:text-gray-400">
-                    +{formatCurrency(account.annualContribution)}/yr
+                    +{formatCurrency(account.annualContribution, country)}/yr
                   </div>
                 </div>
 
@@ -140,7 +135,7 @@ export function AccountList({ accounts, onAdd, onUpdate, onDelete }: AccountList
           {accounts.length > 0 && (
             <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-600 mt-2">
               <span className="font-medium text-gray-700 dark:text-gray-300">Total</span>
-              <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(totalBalance)}</span>
+              <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(totalBalance, country)}</span>
             </div>
           )}
         </div>

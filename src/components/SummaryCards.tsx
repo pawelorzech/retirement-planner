@@ -1,20 +1,13 @@
 import { useState } from 'react';
 import { AccumulationResult, RetirementResult, Profile, Assumptions } from '../types';
-import { STANDARD_DEDUCTION_MFJ, STANDARD_DEDUCTION_SINGLE } from '../utils/constants';
+import { PL_TAX_FREE_ALLOWANCE, STANDARD_DEDUCTION_MFJ, STANDARD_DEDUCTION_SINGLE } from '../utils/constants';
+import { formatCurrency } from '../utils/formatting';
 
 interface SummaryCardsProps {
   profile: Profile;
   assumptions: Assumptions;
   accumulationResult: AccumulationResult;
   retirementResult: RetirementResult;
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value);
 }
 
 function formatPercent(value: number): string {
@@ -150,9 +143,13 @@ export function SummaryCards({
       : 'green'
     : 'green';
 
+  const isPoland = profile.country === 'pl';
+
   const standardDeduction = profile.filingStatus === 'married_filing_jointly'
     ? STANDARD_DEDUCTION_MFJ
     : STANDARD_DEDUCTION_SINGLE;
+  const hasPlAllowance = isPoland && (profile.plTaxRegime ?? 'scale') === 'scale';
+  const taxAllowance = isPoland ? PL_TAX_FREE_ALLOWANCE : standardDeduction;
 
   // Calculate some useful derived values for display
   const yearsToRetirement = Math.max(0, profile.retirementAge - profile.currentAge);
@@ -191,62 +188,67 @@ export function SummaryCards({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <ExpandableStatCard
             title="Total Portfolio"
-            value={formatCurrency(totalAtRetirement)}
+            value={formatCurrency(totalAtRetirement, profile.country)}
             color="blue"
             formula={`Sum of all account balances after ${yearsToRetirement} years of growth`}
             details={
               <div>
                 <p className="font-medium mb-1">Breakdown by tax treatment:</p>
                 <ul className="space-y-0.5">
-                  <li>Pre-tax: {formatCurrency(breakdownByTaxTreatment.pretax)}</li>
-                  <li>Roth: {formatCurrency(breakdownByTaxTreatment.roth)}</li>
-                  <li>Taxable: {formatCurrency(breakdownByTaxTreatment.taxable)}</li>
-                  <li>HSA: {formatCurrency(breakdownByTaxTreatment.hsa)}</li>
+                  <li>Pre-tax: {formatCurrency(breakdownByTaxTreatment.pretax, profile.country)}</li>
+                  <li>Roth: {formatCurrency(breakdownByTaxTreatment.roth, profile.country)}</li>
+                  <li>Taxable: {formatCurrency(breakdownByTaxTreatment.taxable, profile.country)}</li>
+                  <li>HSA: {formatCurrency(breakdownByTaxTreatment.hsa, profile.country)}</li>
                 </ul>
               </div>
             }
           />
           <ExpandableStatCard
             title="Pre-Tax"
-            value={formatCurrency(breakdownByTaxTreatment.pretax)}
+            value={formatCurrency(breakdownByTaxTreatment.pretax, profile.country)}
             subtitle={`${((breakdownByTaxTreatment.pretax / totalAtRetirement) * 100).toFixed(0)}% of portfolio`}
             color="blue"
             formula="Traditional 401(k) + Traditional IRA balances"
             details={
               <p>
-                Pre-tax accounts grow tax-deferred. Withdrawals are taxed as ordinary income.
-                Subject to Required Minimum Distributions (RMDs) starting at age 73.
+                {isPoland
+                  ? 'Pre-tax accounts are taxed as ordinary income in retirement.'
+                  : 'Pre-tax accounts grow tax-deferred. Withdrawals are taxed as ordinary income.'}
+                {!isPoland && ' Subject to Required Minimum Distributions (RMDs) starting at age 73.'}
               </p>
             }
           />
           <ExpandableStatCard
-            title="Roth (Tax-Free)"
-            value={formatCurrency(breakdownByTaxTreatment.roth)}
+            title={isPoland ? 'Tax-Free (IKE)' : 'Roth (Tax-Free)'}
+            value={formatCurrency(breakdownByTaxTreatment.roth, profile.country)}
             subtitle={`${((breakdownByTaxTreatment.roth / totalAtRetirement) * 100).toFixed(0)}% of portfolio`}
             color="green"
-            formula="Roth 401(k) + Roth IRA balances"
+            formula={isPoland ? 'IKE-type balances' : 'Roth 401(k) + Roth IRA balances'}
             details={
               <p>
-                Roth accounts grow tax-free. Qualified withdrawals (after age 59½ and 5-year holding)
-                are completely tax-free. No RMDs required for Roth IRAs.
+                {isPoland
+                  ? 'Tax-free accounts are assumed exempt from capital gains tax after meeting eligibility rules.'
+                  : 'Roth accounts grow tax-free. Qualified withdrawals (after age 59½ and 5-year holding) are completely tax-free. No RMDs required for Roth IRAs.'}
               </p>
             }
           />
           <ExpandableStatCard
             title="Taxable + HSA"
-            value={formatCurrency(breakdownByTaxTreatment.taxable + breakdownByTaxTreatment.hsa)}
+            value={formatCurrency(breakdownByTaxTreatment.taxable + breakdownByTaxTreatment.hsa, profile.country)}
             subtitle={`${(((breakdownByTaxTreatment.taxable + breakdownByTaxTreatment.hsa) / totalAtRetirement) * 100).toFixed(0)}% of portfolio`}
             color="amber"
             formula="Taxable brokerage + HSA balances"
             details={
               <div>
                 <p className="mb-1">
-                  <strong>Taxable:</strong> {formatCurrency(breakdownByTaxTreatment.taxable)} -
-                  Only gains are taxed at capital gains rates (often 0% or 15%).
+                  <strong>Taxable:</strong> {formatCurrency(breakdownByTaxTreatment.taxable, profile.country)} -
+                  {isPoland
+                    ? 'Capital gains are taxed at 19% (Belka).'
+                    : 'Only gains are taxed at capital gains rates (often 0% or 15%).'}
                 </p>
                 <p>
-                  <strong>HSA:</strong> {formatCurrency(breakdownByTaxTreatment.hsa)} -
-                  Tax-free for qualified medical expenses.
+                  <strong>HSA:</strong> {formatCurrency(breakdownByTaxTreatment.hsa, profile.country)} -
+                  {isPoland ? 'No direct PL equivalent; assumed tax-free if used for medical.' : 'Tax-free for qualified medical expenses.'}
                 </p>
               </div>
             }
@@ -260,15 +262,15 @@ export function SummaryCards({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <ExpandableStatCard
             title="Monthly Withdrawal"
-            value={formatCurrency(sustainableMonthlyWithdrawal)}
-            subtitle="In today's dollars"
+            value={formatCurrency(sustainableMonthlyWithdrawal, profile.country)}
+            subtitle={isPoland ? "In today's PLN" : "In today's dollars"}
             color="green"
-            formula={`${formatCurrency(totalAtRetirement)} × ${formatPercent(assumptions.safeWithdrawalRate)} ÷ 12`}
+            formula={`${formatCurrency(totalAtRetirement, profile.country)} × ${formatPercent(assumptions.safeWithdrawalRate)} ÷ 12`}
             details={
               <div>
                 <p className="mb-1">
                   Based on the {formatPercent(assumptions.safeWithdrawalRate)} safe withdrawal rate applied to your
-                  {' '}{formatCurrency(totalAtRetirement)} portfolio.
+                  {' '}{formatCurrency(totalAtRetirement, profile.country)} portfolio.
                 </p>
                 <p>
                   Actual withdrawals will be adjusted for {formatPercent(assumptions.inflationRate)} annual inflation.
@@ -278,17 +280,17 @@ export function SummaryCards({
           />
           <ExpandableStatCard
             title="Annual Withdrawal"
-            value={formatCurrency(sustainableAnnualWithdrawal)}
-            subtitle="In today's dollars"
+            value={formatCurrency(sustainableAnnualWithdrawal, profile.country)}
+            subtitle={isPoland ? "In today's PLN" : "In today's dollars"}
             color="green"
-            formula={`${formatCurrency(totalAtRetirement)} × ${formatPercent(assumptions.safeWithdrawalRate)}`}
+            formula={`${formatCurrency(totalAtRetirement, profile.country)} × ${formatPercent(assumptions.safeWithdrawalRate)}`}
             details={
               <div>
                 <p className="mb-1">
-                  = {formatCurrency(totalAtRetirement)} × {formatPercent(assumptions.safeWithdrawalRate)}
+                  = {formatCurrency(totalAtRetirement, profile.country)} × {formatPercent(assumptions.safeWithdrawalRate)}
                 </p>
                 <p className="mb-1">
-                  = {formatCurrency(sustainableAnnualWithdrawal)}
+                  = {formatCurrency(sustainableAnnualWithdrawal, profile.country)}
                 </p>
                 <p className="text-gray-500 dark:text-gray-400 italic">
                   This is your initial withdrawal amount. Each year it increases by the inflation rate ({formatPercent(assumptions.inflationRate)}).
@@ -301,7 +303,7 @@ export function SummaryCards({
             value={portfolioDepletionAge ? `Age ${portfolioDepletionAge}` : 'Never depletes'}
             subtitle={portfolioLasts}
             color={portfolioStatus as 'red' | 'green'}
-            formula="Simulated year-by-year until balance reaches $0"
+            formula={`Simulated year-by-year until balance reaches ${formatCurrency(0, profile.country)}`}
             details={
               <div>
                 <p className="mb-1">
@@ -316,7 +318,7 @@ export function SummaryCards({
                   </p>
                 ) : (
                   <p className="text-green-600 dark:text-green-400">
-                    Final balance at age {profile.lifeExpectancy}: {formatCurrency(yearlyWithdrawals[yearlyWithdrawals.length - 1]?.totalRemainingBalance || 0)}
+                    Final balance at age {profile.lifeExpectancy}: {formatCurrency(yearlyWithdrawals[yearlyWithdrawals.length - 1]?.totalRemainingBalance || 0, profile.country)}
                   </p>
                 )}
               </div>
@@ -324,24 +326,26 @@ export function SummaryCards({
           />
           <ExpandableStatCard
             title="Lifetime Taxes"
-            value={formatCurrency(lifetimeTaxesPaid)}
+            value={formatCurrency(lifetimeTaxesPaid, profile.country)}
             subtitle="Total taxes in retirement"
             color="purple"
-            formula="Sum of federal + state taxes across all retirement years"
+            formula={isPoland ? 'Sum of PIT + capital gains taxes across all retirement years' : 'Sum of federal + state taxes across all retirement years'}
             details={
               <div>
                 <p className="mb-1">
                   Over {retirementYears} years of retirement:
                 </p>
                 <ul className="space-y-0.5 mb-2">
-                  <li>Federal taxes: {formatCurrency(yearlyWithdrawals.reduce((sum, y) => sum + y.federalTax, 0))}</li>
-                  <li>State taxes: {formatCurrency(yearlyWithdrawals.reduce((sum, y) => sum + y.stateTax, 0))}</li>
+                  <li>{isPoland ? 'PIT taxes' : 'Federal taxes'}: {formatCurrency(yearlyWithdrawals.reduce((sum, y) => sum + y.federalTax, 0), profile.country)}</li>
+                  <li>{isPoland ? 'Local taxes' : 'State taxes'}: {formatCurrency(yearlyWithdrawals.reduce((sum, y) => sum + y.stateTax, 0), profile.country)}</li>
                 </ul>
                 <p>
                   Average effective tax rate: {formatPercent(avgEffectiveTaxRate)}
                 </p>
                 <p className="text-gray-500 dark:text-gray-400 italic mt-1">
-                  Standard deduction: {formatCurrency(standardDeduction)} ({profile.filingStatus === 'married_filing_jointly' ? 'MFJ' : 'Single'})
+                  {isPoland
+                    ? `Kwota wolna: ${hasPlAllowance ? formatCurrency(taxAllowance, profile.country) : 'n/a'}`
+                    : `Standard deduction: ${formatCurrency(taxAllowance, profile.country)} (${profile.filingStatus === 'married_filing_jointly' ? 'MFJ' : 'Single'})`}
                 </p>
               </div>
             }
@@ -379,18 +383,22 @@ export function SummaryCards({
           />
           {profile.socialSecurityBenefit && profile.socialSecurityStartAge ? (
             <ExpandableStatCard
-              title="Social Security"
-              value={formatCurrency(profile.socialSecurityBenefit)}
+              title={isPoland ? 'ZUS Pension' : 'Social Security'}
+              value={formatCurrency(profile.socialSecurityBenefit, profile.country)}
               subtitle={`Starting at age ${profile.socialSecurityStartAge}`}
               color="teal"
               formula="Annual benefit in today's dollars, adjusted for inflation"
               details={
                 <div>
                   <p className="mb-1">
-                    Social Security income is assumed to grow with inflation ({formatPercent(assumptions.inflationRate)}/year).
+                    {isPoland
+                      ? `ZUS income is assumed to grow with inflation (${formatPercent(assumptions.inflationRate)}/year).`
+                      : `Social Security income is assumed to grow with inflation (${formatPercent(assumptions.inflationRate)}/year).`}
                   </p>
                   <p>
-                    85% of Social Security is included as taxable income (maximum taxable portion).
+                    {isPoland
+                      ? '100% of ZUS benefit is treated as taxable income.'
+                      : '85% of Social Security is included as taxable income (maximum taxable portion).'}
                   </p>
                 </div>
               }

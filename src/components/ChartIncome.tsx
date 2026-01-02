@@ -10,30 +10,14 @@ import {
   Legend,
   ReferenceLine,
 } from 'recharts';
-import { RetirementResult } from '../types';
+import { Country, RetirementResult } from '../types';
 import { CHART_COLORS } from '../utils/constants';
+import { formatCompactCurrency, formatCurrency } from '../utils/formatting';
 
 interface ChartIncomeProps {
   result: RetirementResult;
   isDarkMode?: boolean;
-}
-
-function formatCurrency(value: number): string {
-  if (Math.abs(value) >= 1000000) {
-    return `$${(value / 1000000).toFixed(1)}M`;
-  }
-  if (Math.abs(value) >= 1000) {
-    return `$${(value / 1000).toFixed(0)}K`;
-  }
-  return `$${value.toFixed(0)}`;
-}
-
-function formatTooltipValue(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value);
+  country: Country;
 }
 
 interface CustomTooltipProps {
@@ -41,13 +25,15 @@ interface CustomTooltipProps {
   payload?: Array<{ name: string; value: number; color: string; dataKey: string }>;
   label?: number;
   result: RetirementResult;
+  country: Country;
 }
 
-function CustomTooltip({ active, payload, label, result }: CustomTooltipProps) {
+function CustomTooltip({ active, payload, label, result, country }: CustomTooltipProps) {
   if (!active || !payload) return null;
 
   const yearData = result.yearlyWithdrawals.find(y => y.age === label);
   if (!yearData) return null;
+  const isPoland = country === 'pl';
 
   return (
     <div className="bg-white dark:bg-gray-800 p-3 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
@@ -55,36 +41,39 @@ function CustomTooltip({ active, payload, label, result }: CustomTooltipProps) {
       <div className="space-y-1 text-sm">
         <div className="flex justify-between gap-4">
           <span style={{ color: CHART_COLORS.pretax }}>Withdrawals:</span>
-          <span className="font-medium text-gray-900 dark:text-white">{formatTooltipValue(yearData.totalWithdrawal)}</span>
+          <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(yearData.totalWithdrawal, country)}</span>
         </div>
         {yearData.socialSecurityIncome > 0 && (
           <div className="flex justify-between gap-4">
-            <span style={{ color: CHART_COLORS.socialSecurity }}>Social Security:</span>
-            <span className="font-medium text-gray-900 dark:text-white">{formatTooltipValue(yearData.socialSecurityIncome)}</span>
+            <span style={{ color: CHART_COLORS.socialSecurity }}>
+              {isPoland ? 'ZUS:' : 'Social Security:'}
+            </span>
+            <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(yearData.socialSecurityIncome, country)}</span>
           </div>
         )}
         <div className="flex justify-between gap-4 border-t border-gray-200 dark:border-gray-600 pt-1 mt-1">
           <span className="text-gray-600 dark:text-gray-400">Gross Income:</span>
-          <span className="font-medium text-gray-900 dark:text-white">{formatTooltipValue(yearData.grossIncome)}</span>
+          <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(yearData.grossIncome, country)}</span>
         </div>
         <div className="flex justify-between gap-4">
           <span style={{ color: CHART_COLORS.tax }}>Taxes:</span>
-          <span className="font-medium text-red-600 dark:text-red-400">-{formatTooltipValue(yearData.totalTax)}</span>
+          <span className="font-medium text-red-600 dark:text-red-400">-{formatCurrency(yearData.totalTax, country)}</span>
         </div>
         <div className="border-t border-gray-200 dark:border-gray-600 mt-2 pt-2 flex justify-between gap-4 font-semibold">
           <span style={{ color: CHART_COLORS.spending }}>After-Tax Income:</span>
-          <span className="text-gray-900 dark:text-white">{formatTooltipValue(yearData.afterTaxIncome)}</span>
+          <span className="text-gray-900 dark:text-white">{formatCurrency(yearData.afterTaxIncome, country)}</span>
         </div>
       </div>
     </div>
   );
 }
 
-export function ChartIncome({ result, isDarkMode = false }: ChartIncomeProps) {
+export function ChartIncome({ result, isDarkMode = false, country }: ChartIncomeProps) {
   // Colors based on dark mode
   const gridColor = isDarkMode ? '#374151' : '#e5e7eb';
   const tickColor = isDarkMode ? '#9ca3af' : '#6b7280';
   const tickLineColor = isDarkMode ? '#4b5563' : '#d1d5db';
+  const isPoland = country === 'pl';
   // Transform data for the chart
   // Show gross income as stacked bars (positive), taxes as separate negative bar
   const chartData = result.yearlyWithdrawals.map(year => ({
@@ -109,13 +98,13 @@ export function ChartIncome({ result, isDarkMode = false }: ChartIncomeProps) {
             stroke={tickLineColor}
           />
           <YAxis
-            tickFormatter={formatCurrency}
+            tickFormatter={(value: number) => formatCompactCurrency(value, country)}
             tick={{ fontSize: 12, fill: tickColor }}
             tickLine={{ stroke: tickLineColor }}
             stroke={tickLineColor}
             width={60}
           />
-          <Tooltip content={<CustomTooltip result={result} />} />
+          <Tooltip content={<CustomTooltip result={result} country={country} />} />
           <Legend
             wrapperStyle={{ paddingTop: '10px' }}
             formatter={(value) => <span style={{ color: tickColor }}>{value}</span>}
@@ -131,7 +120,7 @@ export function ChartIncome({ result, isDarkMode = false }: ChartIncomeProps) {
           />
           <Bar
             dataKey="socialSecurity"
-            name="Social Security"
+            name={isPoland ? 'ZUS' : 'Social Security'}
             stackId="income"
             fill={CHART_COLORS.socialSecurity}
             fillOpacity={0.8}

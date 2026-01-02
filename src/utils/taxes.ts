@@ -1,4 +1,4 @@
-import { FilingStatus, TaxBracket } from '../types';
+import { FilingStatus, Profile, TaxBracket } from '../types';
 import {
   TAX_BRACKETS_MFJ,
   TAX_BRACKETS_SINGLE,
@@ -6,6 +6,9 @@ import {
   STANDARD_DEDUCTION_SINGLE,
   CAPITAL_GAINS_BRACKETS_MFJ,
   CAPITAL_GAINS_BRACKETS_SINGLE,
+  PL_TAX_BRACKETS,
+  PL_TAX_FREE_ALLOWANCE,
+  PL_CAPITAL_GAINS_RATE,
 } from './constants';
 
 export function getTaxBrackets(filingStatus: FilingStatus): TaxBracket[] {
@@ -18,6 +21,10 @@ export function getStandardDeduction(filingStatus: FilingStatus): number {
   return filingStatus === 'married_filing_jointly'
     ? STANDARD_DEDUCTION_MFJ
     : STANDARD_DEDUCTION_SINGLE;
+}
+
+export function getPolandTaxFreeAllowance(): number {
+  return PL_TAX_FREE_ALLOWANCE;
 }
 
 export function getCapitalGainsBrackets(filingStatus: FilingStatus): TaxBracket[] {
@@ -113,6 +120,44 @@ export function calculateTotalFederalTax(
   return incomeTax + capitalGainsTax;
 }
 
+export function calculatePolandIncomeTax(
+  ordinaryIncome: number,
+  profile: Profile
+): number {
+  if (ordinaryIncome <= 0) return 0;
+  const regime = profile.plTaxRegime ?? 'scale';
+
+  if (regime === 'linear') {
+    return ordinaryIncome * 0.19;
+  }
+
+  if (regime === 'ryczalt') {
+    const rate = profile.plRyczaltRate ?? 0.12;
+    return ordinaryIncome * rate;
+  }
+
+  const taxableIncome = Math.max(0, ordinaryIncome - PL_TAX_FREE_ALLOWANCE);
+  let tax = 0;
+  let remainingIncome = taxableIncome;
+
+  for (const bracket of PL_TAX_BRACKETS) {
+    const bracketWidth = bracket.max - bracket.min;
+    const incomeInBracket = Math.min(remainingIncome, bracketWidth);
+
+    if (incomeInBracket <= 0) break;
+
+    tax += incomeInBracket * bracket.rate;
+    remainingIncome -= incomeInBracket;
+  }
+
+  return tax;
+}
+
+export function calculatePolandCapitalGainsTax(capitalGains: number): number {
+  if (capitalGains <= 0) return 0;
+  return capitalGains * PL_CAPITAL_GAINS_RATE;
+}
+
 /**
  * Calculate state tax (simplified flat rate)
  */
@@ -121,6 +166,30 @@ export function calculateStateTax(
   stateTaxRate: number
 ): number {
   return Math.max(0, taxableIncome) * stateTaxRate;
+}
+
+export function calculateCountryTaxes(
+  ordinaryIncome: number,
+  capitalGains: number,
+  profile: Profile
+): { federalTax: number; stateTax: number; totalTax: number } {
+  if (profile.country === 'pl') {
+    const incomeTax = calculatePolandIncomeTax(ordinaryIncome, profile);
+    const capitalGainsTax = calculatePolandCapitalGainsTax(capitalGains);
+    const totalTax = incomeTax + capitalGainsTax;
+    return { federalTax: incomeTax, stateTax: 0, totalTax };
+  }
+
+  const federalTax = calculateTotalFederalTax(
+    ordinaryIncome,
+    capitalGains,
+    profile.filingStatus
+  );
+  const stateTax = calculateStateTax(
+    ordinaryIncome + capitalGains - getStandardDeduction(profile.filingStatus),
+    profile.stateTaxRate
+  );
+  return { federalTax, stateTax, totalTax: federalTax + stateTax };
 }
 
 /**

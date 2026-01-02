@@ -1,4 +1,4 @@
-import { Profile, FilingStatus } from '../types';
+import { Profile, FilingStatus, Country, PlTaxRegime } from '../types';
 import { NumberInput } from './NumberInput';
 import { Tooltip } from './Tooltip';
 
@@ -17,11 +17,41 @@ export function ProfileForm({ profile, onChange }: ProfileFormProps) {
     });
   };
 
+  const handleCountryChange = (country: Country) => {
+    const nextProfile: Profile = {
+      ...profile,
+      country,
+    };
+
+    if (country === 'pl') {
+      nextProfile.plTaxRegime = nextProfile.plTaxRegime ?? 'scale';
+      nextProfile.plRyczaltRate = nextProfile.plRyczaltRate ?? 0.12;
+    }
+
+    onChange(nextProfile);
+  };
+
+  const isPoland = profile.country === 'pl';
+
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-600 pb-2">Personal Information</h3>
 
       <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Country
+          </label>
+          <select
+            value={profile.country}
+            onChange={(e) => handleCountryChange(e.target.value as Country)}
+            className={inputClassName}
+          >
+            <option value="usa">United States</option>
+            <option value="pl">Poland</option>
+          </select>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Current Age
@@ -64,44 +94,88 @@ export function ProfileForm({ profile, onChange }: ProfileFormProps) {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Filing Status
-          </label>
-          <select
-            value={profile.filingStatus}
-            onChange={(e) => handleChange('filingStatus', e.target.value as FilingStatus)}
-            className={inputClassName}
-          >
-            <option value="single">Single</option>
-            <option value="married_filing_jointly">Married Filing Jointly</option>
-          </select>
-        </div>
+        {!isPoland && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Filing Status
+            </label>
+            <select
+              value={profile.filingStatus}
+              onChange={(e) => handleChange('filingStatus', e.target.value as FilingStatus)}
+              className={inputClassName}
+            >
+              <option value="single">Single</option>
+              <option value="married_filing_jointly">Married Filing Jointly</option>
+            </select>
+          </div>
+        )}
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            State Tax Rate (%)
-          </label>
-          <NumberInput
-            value={profile.stateTaxRate}
-            onChange={(val) => handleChange('stateTaxRate', val)}
-            min={0}
-            max={15}
-            isPercentage
-            decimals={1}
-            defaultValue={0.05}
-            className={inputClassName}
-          />
-        </div>
+        {!isPoland && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              State Tax Rate (%)
+            </label>
+            <NumberInput
+              value={profile.stateTaxRate}
+              onChange={(val) => handleChange('stateTaxRate', val)}
+              min={0}
+              max={15}
+              isPercentage
+              decimals={1}
+              defaultValue={0.05}
+              className={inputClassName}
+            />
+          </div>
+        )}
+
+        {isPoland && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Forma opodatkowania
+            </label>
+            <select
+              value={profile.plTaxRegime ?? 'scale'}
+              onChange={(e) => handleChange('plTaxRegime', e.target.value as PlTaxRegime)}
+              className={inputClassName}
+            >
+              <option value="scale">Skala PIT (12% / 32%)</option>
+              <option value="linear">Podatek liniowy (19%)</option>
+              <option value="ryczalt">Ryczalt</option>
+            </select>
+          </div>
+        )}
+
+        {isPoland && (profile.plTaxRegime ?? 'scale') === 'ryczalt' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Stawka ryczaltu (%)
+            </label>
+            <NumberInput
+              value={profile.plRyczaltRate ?? 0.12}
+              onChange={(val) => handleChange('plRyczaltRate', val)}
+              min={2}
+              max={20}
+              isPercentage
+              decimals={1}
+              defaultValue={0.12}
+              className={inputClassName}
+            />
+          </div>
+        )}
       </div>
 
-      <h4 className="text-md font-medium text-gray-800 dark:text-gray-200 mt-6 mb-3">Social Security</h4>
+      <h4 className="text-md font-medium text-gray-800 dark:text-gray-200 mt-6 mb-3">
+        {isPoland ? 'ZUS (Emerytura)' : 'Social Security'}
+      </h4>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Annual Benefit (today's $)
-            <Tooltip text="Your estimated annual Social Security benefit in today's dollars" />
+            Annual Benefit (today's {isPoland ? 'PLN' : 'USD'})
+            <Tooltip text={isPoland
+              ? 'Twoja szacowana roczna emerytura ZUS w dzisiejszych cenach'
+              : 'Your estimated annual Social Security benefit in today\\'s dollars'
+            } />
           </label>
           <NumberInput
             value={profile.socialSecurityBenefit || 0}
@@ -115,7 +189,7 @@ export function ProfileForm({ profile, onChange }: ProfileFormProps) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Start Age
+            {isPoland ? 'Wiek rozpoczecia' : 'Start Age'}
           </label>
           <NumberInput
             value={profile.socialSecurityStartAge || 67}

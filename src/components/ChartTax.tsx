@@ -9,30 +9,14 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import { RetirementResult } from '../types';
+import { Country, RetirementResult } from '../types';
 import { CHART_COLORS } from '../utils/constants';
+import { formatCompactCurrency, formatCurrency } from '../utils/formatting';
 
 interface ChartTaxProps {
   result: RetirementResult;
   isDarkMode?: boolean;
-}
-
-function formatCurrency(value: number): string {
-  if (value >= 1000000) {
-    return `$${(value / 1000000).toFixed(1)}M`;
-  }
-  if (value >= 1000) {
-    return `$${(value / 1000).toFixed(0)}K`;
-  }
-  return `$${value.toFixed(0)}`;
-}
-
-function formatTooltipValue(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value);
+  country: Country;
 }
 
 interface CustomTooltipProps {
@@ -40,13 +24,15 @@ interface CustomTooltipProps {
   payload?: Array<{ name: string; value: number; color: string }>;
   label?: number;
   result: RetirementResult;
+  country: Country;
 }
 
-function CustomTooltip({ active, payload, label, result }: CustomTooltipProps) {
+function CustomTooltip({ active, payload, label, result, country }: CustomTooltipProps) {
   if (!active || !payload) return null;
 
   const yearData = result.yearlyWithdrawals.find(y => y.age === label);
   if (!yearData) return null;
+  const isPoland = country === 'pl';
 
   const effectiveRate = yearData.grossIncome > 0
     ? ((yearData.totalTax / yearData.grossIncome) * 100).toFixed(1)
@@ -57,17 +43,17 @@ function CustomTooltip({ active, payload, label, result }: CustomTooltipProps) {
       <p className="font-medium text-gray-900 dark:text-white mb-2">Age {label}</p>
       <div className="space-y-1 text-sm">
         <div className="flex justify-between gap-4">
-          <span className="text-blue-600 dark:text-blue-400">Federal Tax:</span>
-          <span className="font-medium text-gray-900 dark:text-white">{formatTooltipValue(yearData.federalTax)}</span>
+          <span className="text-blue-600 dark:text-blue-400">{isPoland ? 'PIT:' : 'Federal Tax:'}</span>
+          <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(yearData.federalTax, country)}</span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-purple-600 dark:text-purple-400">State Tax:</span>
-          <span className="font-medium text-gray-900 dark:text-white">{formatTooltipValue(yearData.stateTax)}</span>
+          <span className="text-purple-600 dark:text-purple-400">{isPoland ? 'Local Tax:' : 'State Tax:'}</span>
+          <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(yearData.stateTax, country)}</span>
         </div>
         <div className="border-t border-gray-200 dark:border-gray-600 mt-2 pt-2">
           <div className="flex justify-between gap-4 font-semibold">
             <span style={{ color: CHART_COLORS.tax }}>Total Tax:</span>
-            <span className="text-gray-900 dark:text-white">{formatTooltipValue(yearData.totalTax)}</span>
+            <span className="text-gray-900 dark:text-white">{formatCurrency(yearData.totalTax, country)}</span>
           </div>
           <div className="flex justify-between gap-4 text-gray-600 dark:text-gray-400 mt-1">
             <span>Effective Rate:</span>
@@ -79,11 +65,12 @@ function CustomTooltip({ active, payload, label, result }: CustomTooltipProps) {
   );
 }
 
-export function ChartTax({ result, isDarkMode = false }: ChartTaxProps) {
+export function ChartTax({ result, isDarkMode = false, country }: ChartTaxProps) {
   // Colors based on dark mode
   const gridColor = isDarkMode ? '#374151' : '#e5e7eb';
   const tickColor = isDarkMode ? '#9ca3af' : '#6b7280';
   const tickLineColor = isDarkMode ? '#4b5563' : '#d1d5db';
+  const isPoland = country === 'pl';
   // Transform data for the chart
   const chartData = result.yearlyWithdrawals.map(year => {
     const effectiveRate = year.grossIncome > 0
@@ -112,7 +99,7 @@ export function ChartTax({ result, isDarkMode = false }: ChartTaxProps) {
           />
           <YAxis
             yAxisId="left"
-            tickFormatter={formatCurrency}
+            tickFormatter={(value: number) => formatCompactCurrency(value, country)}
             tick={{ fontSize: 12, fill: tickColor }}
             tickLine={{ stroke: tickLineColor }}
             stroke={tickLineColor}
@@ -128,7 +115,7 @@ export function ChartTax({ result, isDarkMode = false }: ChartTaxProps) {
             domain={[0, 40]}
             width={50}
           />
-          <Tooltip content={<CustomTooltip result={result} />} />
+          <Tooltip content={<CustomTooltip result={result} country={country} />} />
           <Legend
             wrapperStyle={{ paddingTop: '10px' }}
             formatter={(value) => <span style={{ color: tickColor }}>{value}</span>}
@@ -136,7 +123,7 @@ export function ChartTax({ result, isDarkMode = false }: ChartTaxProps) {
           <Bar
             yAxisId="left"
             dataKey="federalTax"
-            name="Federal Tax"
+            name={isPoland ? 'PIT' : 'Federal Tax'}
             stackId="tax"
             fill="#3b82f6"
             fillOpacity={0.8}
@@ -144,7 +131,7 @@ export function ChartTax({ result, isDarkMode = false }: ChartTaxProps) {
           <Bar
             yAxisId="left"
             dataKey="stateTax"
-            name="State Tax"
+            name={isPoland ? 'Local Tax' : 'State Tax'}
             stackId="tax"
             fill="#8b5cf6"
             fillOpacity={0.8}

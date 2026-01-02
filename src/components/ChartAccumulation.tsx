@@ -8,31 +8,15 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import { Account, AccumulationResult, getTaxTreatment } from '../types';
+import { Account, AccumulationResult, Country, getTaxTreatment } from '../types';
 import { CHART_COLORS } from '../utils/constants';
+import { formatCompactCurrency, formatCurrency } from '../utils/formatting';
 
 interface ChartAccumulationProps {
   accounts: Account[];
   result: AccumulationResult;
   isDarkMode?: boolean;
-}
-
-function formatCurrency(value: number): string {
-  if (value >= 1000000) {
-    return `$${(value / 1000000).toFixed(1)}M`;
-  }
-  if (value >= 1000) {
-    return `$${(value / 1000).toFixed(0)}K`;
-  }
-  return `$${value.toFixed(0)}`;
-}
-
-function formatTooltipValue(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value);
+  country: Country;
 }
 
 interface TooltipPayload {
@@ -46,9 +30,10 @@ interface CustomTooltipProps {
   payload?: TooltipPayload[];
   label?: number;
   accounts: Account[];
+  country: Country;
 }
 
-function CustomTooltip({ active, payload, label, accounts }: CustomTooltipProps) {
+function CustomTooltip({ active, payload, label, accounts, country }: CustomTooltipProps) {
   if (!active || !payload) return null;
 
   const total = payload.reduce((sum, entry) => sum + entry.value, 0);
@@ -61,19 +46,19 @@ function CustomTooltip({ active, payload, label, accounts }: CustomTooltipProps)
         return (
           <div key={index} className="flex justify-between gap-4 text-sm">
             <span style={{ color: entry.color }}>{account?.name || entry.name}:</span>
-            <span className="font-medium">{formatTooltipValue(entry.value)}</span>
+            <span className="font-medium">{formatCurrency(entry.value, country)}</span>
           </div>
         );
       })}
       <div className="border-t border-gray-200 dark:border-gray-600 mt-2 pt-2 flex justify-between gap-4 text-sm font-semibold text-gray-900 dark:text-white">
         <span>Total:</span>
-        <span>{formatTooltipValue(total)}</span>
+        <span>{formatCurrency(total, country)}</span>
       </div>
     </div>
   );
 }
 
-export function ChartAccumulation({ accounts, result, isDarkMode = false }: ChartAccumulationProps) {
+export function ChartAccumulation({ accounts, result, isDarkMode = false, country }: ChartAccumulationProps) {
   // Colors based on dark mode
   const gridColor = isDarkMode ? '#374151' : '#e5e7eb';
   const tickColor = isDarkMode ? '#9ca3af' : '#6b7280';
@@ -110,13 +95,13 @@ export function ChartAccumulation({ accounts, result, isDarkMode = false }: Char
             stroke={tickLineColor}
           />
           <YAxis
-            tickFormatter={formatCurrency}
+            tickFormatter={(value: number) => formatCompactCurrency(value, country)}
             tick={{ fontSize: 12, fill: tickColor }}
             tickLine={{ stroke: tickLineColor }}
             stroke={tickLineColor}
             width={60}
           />
-          <Tooltip content={<CustomTooltip accounts={accounts} />} />
+          <Tooltip content={<CustomTooltip accounts={accounts} country={country} />} />
           <Legend
             wrapperStyle={{ paddingTop: '10px' }}
             formatter={(value) => {
